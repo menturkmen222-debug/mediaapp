@@ -1,8 +1,6 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:  # telefoningdan "Run workflow" bosib ishga tushirish uchun
 
 jobs:
@@ -10,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -18,13 +17,35 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x ./gradlew
+    - name: Check if gradlew exists
+      run: |
+        ls -la
+        find . -name "gradlew" || echo "gradlew not found!"
 
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug --stacktrace --no-daemon --no-parallel
+    - name: Make gradlew executable (if exists in root)
+      if: success()
+      run: chmod +x ./gradlew || echo "chmod failed or gradlew not in root"
+
+    - name: Make gradlew executable (if in android folder)
+      if: success()
+      run: |
+        if [ -f "./android/gradlew" ]; then
+          chmod +x ./android/gradlew
+        else
+          echo "No gradlew in android folder"
+        fi
+
+    - name: Build APK (try root gradlew)
+      run: |
+        if [ -f "./gradlew" ]; then
+          ./gradlew assembleDebug --stacktrace --no-daemon --no-parallel
+        else
+          echo "Root gradlew not found, trying android folder..."
+          cd android && ./gradlew assembleDebug --stacktrace --no-daemon --no-parallel
+        fi
 
     - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
